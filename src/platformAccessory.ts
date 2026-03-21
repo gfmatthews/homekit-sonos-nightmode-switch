@@ -1,52 +1,57 @@
 import { PlatformAccessory, CharacteristicValue, Service } from 'homebridge';
 import { SonosSoundFeaturesPlatform } from './platform';
-import { SonosNightModeDevice } from './sonosDevice';
+import { SonosNightModeDevice, DeviceInfo } from './sonosDevice';
 
 export class SonosSoundFeaturesAccessory {
-  private nightModeService: Service;
-  private speechEnhancementService: Service;
+  private nightModeService?: Service;
+  private speechEnhancementService?: Service;
 
   constructor(
     private readonly platform: SonosSoundFeaturesPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly device: SonosNightModeDevice,
+    info: DeviceInfo,
   ) {
     // Accessory Information
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Sonos')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Soundbar')
+      .setCharacteristic(this.platform.Characteristic.Model, info.model ?? 'Soundbar')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.device.host);
 
-    // Night Mode switch
-    this.nightModeService =
-      this.accessory.getService('Night Mode') ??
-      this.accessory.addService(this.platform.Service.Switch, 'Night Mode', 'nightmode');
+    // Night Mode switch (only on supported devices)
+    if (info.supportsNightMode) {
+      this.nightModeService =
+        this.accessory.getService('Night Mode') ??
+        this.accessory.addService(this.platform.Service.Switch, 'Night Mode', 'nightmode');
 
-    this.nightModeService.setCharacteristic(
-      this.platform.Characteristic.Name,
-      'Night Mode',
-    );
+      this.nightModeService.setCharacteristic(
+        this.platform.Characteristic.Name,
+        'Night Mode',
+      );
 
-    this.nightModeService
-      .getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.getNightMode.bind(this))
-      .onSet(this.setNightMode.bind(this));
+      this.nightModeService
+        .getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.getNightMode.bind(this))
+        .onSet(this.setNightMode.bind(this));
+    }
 
-    // Speech Enhancement switch
-    this.speechEnhancementService =
-      this.accessory.getService('Speech Enhancement') ??
-      this.accessory.addService(this.platform.Service.Switch, 'Speech Enhancement', 'speechenhancement');
+    // Speech Enhancement switch (only on supported devices)
+    if (info.supportsSpeechEnhancement) {
+      this.speechEnhancementService =
+        this.accessory.getService('Speech Enhancement') ??
+        this.accessory.addService(this.platform.Service.Switch, 'Speech Enhancement', 'speechenhancement');
 
-    this.speechEnhancementService.setCharacteristic(
-      this.platform.Characteristic.Name,
-      'Speech Enhancement',
-    );
+      this.speechEnhancementService.setCharacteristic(
+        this.platform.Characteristic.Name,
+        'Speech Enhancement',
+      );
 
-    this.speechEnhancementService
-      .getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.getSpeechEnhancement.bind(this))
-      .onSet(this.setSpeechEnhancement.bind(this));
+      this.speechEnhancementService
+        .getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.getSpeechEnhancement.bind(this))
+        .onSet(this.setSpeechEnhancement.bind(this));
+    }
   }
 
   async getNightMode(): Promise<CharacteristicValue> {

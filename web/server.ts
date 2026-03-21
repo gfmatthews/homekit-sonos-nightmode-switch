@@ -27,12 +27,15 @@ app.get('/api/discover', async (_req, res) => {
 app.get('/api/device/:ip/status', async (req, res) => {
   try {
     const device = new SonosNightModeDevice(req.params.ip);
-    const [nightMode, speechEnhancement, info] = await Promise.all([
-      device.getNightMode(),
-      device.getSpeechEnhancement(),
-      device.getDeviceInfo(),
-    ]);
-    res.json({ ...info, nightMode, speechEnhancement });
+    const info = await device.getDeviceInfo();
+    const result: Record<string, unknown> = { ...info };
+    if (info.supportsNightMode) {
+      result.nightMode = await device.getNightMode();
+    }
+    if (info.supportsSpeechEnhancement) {
+      result.speechEnhancement = await device.getSpeechEnhancement();
+    }
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

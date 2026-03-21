@@ -63,6 +63,18 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
     this.log.info(`Found ${discovered.length} device(s)`);
 
     for (const d of discovered) {
+      // Fetch full device info including feature support
+      try {
+        d.info = await d.device.getDeviceInfo();
+      } catch (err) {
+        this.log.warn(`Could not get info for ${d.info.ip}:`, (err as Error).message);
+      }
+
+      if (!d.info.supportsNightMode && !d.info.supportsSpeechEnhancement) {
+        this.log.info(`Skipping ${d.info.name} (${d.info.model ?? d.info.ip}) — no supported sound features`);
+        continue;
+      }
+
       const uuid = this.api.hap.uuid.generate(d.info.ip);
       const existingAccessory = this.cachedAccessories.find((a) => a.UUID === uuid);
 
@@ -70,12 +82,12 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
         this.log.info('Restoring existing accessory:', existingAccessory.displayName);
         existingAccessory.context.device = d.info;
         this.api.updatePlatformAccessories([existingAccessory]);
-        new SonosSoundFeaturesAccessory(this, existingAccessory, d.device);
+        new SonosSoundFeaturesAccessory(this, existingAccessory, d.device, d.info);
       } else {
         this.log.info('Adding new accessory:', d.info.name);
         const accessory = new this.api.platformAccessory(d.info.name, uuid);
         accessory.context.device = d.info;
-        new SonosSoundFeaturesAccessory(this, accessory, d.device);
+        new SonosSoundFeaturesAccessory(this, accessory, d.device, d.info);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     }
