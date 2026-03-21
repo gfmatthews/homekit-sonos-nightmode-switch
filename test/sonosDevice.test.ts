@@ -181,5 +181,61 @@ describe('SonosNightModeDevice', () => {
       expect(info.name).toBe('192.168.1.100');
       expect(info.ip).toBe('192.168.1.100');
     });
+
+    it('should include serialNumber from device description', async () => {
+      sonosMocks.__mockDeviceDescription.mockResolvedValue({
+        roomName: 'Living Room',
+        modelDescription: 'Sonos Arc',
+        serialNum: 'RINCON_00000000000001',
+      });
+      setupHttpMock(200, soapOkResponse('0'));
+      const info = await device.getDeviceInfo();
+      expect(info.serialNumber).toBe('RINCON_00000000000001');
+    });
+
+    it('should have undefined serialNumber when not in description', async () => {
+      sonosMocks.__mockDeviceDescription.mockResolvedValue({
+        roomName: 'Living Room',
+        modelDescription: 'Sonos Arc',
+      });
+      setupHttpMock(200, soapOkResponse('0'));
+      const info = await device.getDeviceInfo();
+      expect(info.serialNumber).toBeUndefined();
+    });
+  });
+
+  describe('updateHost', () => {
+    it('should update the host property', () => {
+      expect(device.host).toBe('192.168.1.100');
+      device.updateHost('192.168.1.200');
+      expect(device.host).toBe('192.168.1.200');
+    });
+
+    it('should use the new host for subsequent SOAP requests', async () => {
+      device.updateHost('192.168.1.200');
+      setupHttpMock(200, soapOkResponse('1'));
+      await device.getNightMode();
+      const callOpts = mockHttpRequest.mock.calls[0][0];
+      expect(callOpts.hostname).toBe('192.168.1.200');
+    });
+  });
+
+  describe('SOAP timeout', () => {
+    it('should reject when request times out', async () => {
+      const requestEmitter = Object.assign(new EventEmitter(), {
+        write: jest.fn(),
+        end: jest.fn(),
+        destroy: jest.fn(),
+      });
+
+      mockHttpRequest.mockImplementation(() => {
+        process.nextTick(() => {
+          requestEmitter.emit('timeout');
+        });
+        return requestEmitter;
+      });
+
+      await expect(device.getNightMode()).rejects.toThrow('timed out');
+    });
   });
 });

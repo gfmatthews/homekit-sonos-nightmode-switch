@@ -5,19 +5,22 @@ import { SonosNightModeDevice, DeviceInfo } from './sonosDevice';
 export class SonosSoundFeaturesAccessory {
   private nightModeService?: Service;
   private speechEnhancementService?: Service;
+  private readonly serialNumber?: string;
 
   constructor(
     private readonly platform: SonosSoundFeaturesPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly device: SonosNightModeDevice,
-    info: DeviceInfo,
+    private info: DeviceInfo,
   ) {
+    this.serialNumber = info.serialNumber;
+
     // Accessory Information
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Sonos')
       .setCharacteristic(this.platform.Characteristic.Model, info.model ?? 'Soundbar')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.device.host);
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, info.serialNumber ?? this.device.host);
 
     // Night Mode switch (only on supported devices)
     if (info.supportsNightMode) {
@@ -52,6 +55,29 @@ export class SonosSoundFeaturesAccessory {
     }
   }
 
+  /**
+   * Fire-and-forget background re-discovery after a communication failure.
+   * If successful, updates the device host so the next HomeKit request uses the new IP.
+   */
+  private triggerRediscovery(): void {
+    if (!this.serialNumber) {
+      return;
+    }
+    this.platform.rediscoverDevice(this.serialNumber).then((newIp) => {
+      if (newIp && newIp !== this.device.host) {
+        this.platform.log.info(
+          `Updating "${this.accessory.displayName}" from ${this.device.host} to ${newIp}`,
+        );
+        this.device.updateHost(newIp);
+        this.info.ip = newIp;
+        this.accessory.context.device = { ...this.info, ip: newIp };
+        this.platform.api.updatePlatformAccessories([this.accessory]);
+      }
+    }).catch((err) => {
+      this.platform.log.debug('Background re-discovery error:', (err as Error).message);
+    });
+  }
+
   async getNightMode(): Promise<CharacteristicValue> {
     try {
       const value = await this.device.getNightMode();
@@ -59,6 +85,7 @@ export class SonosSoundFeaturesAccessory {
       return value;
     } catch (err) {
       this.platform.log.error('Failed to get Night Mode:', (err as Error).message);
+      this.triggerRediscovery();
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );
@@ -71,6 +98,7 @@ export class SonosSoundFeaturesAccessory {
       this.platform.log.debug('Set Night Mode ->', value);
     } catch (err) {
       this.platform.log.error('Failed to set Night Mode:', (err as Error).message);
+      this.triggerRediscovery();
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );
@@ -84,6 +112,7 @@ export class SonosSoundFeaturesAccessory {
       return value;
     } catch (err) {
       this.platform.log.error('Failed to get Speech Enhancement:', (err as Error).message);
+      this.triggerRediscovery();
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );
@@ -96,6 +125,7 @@ export class SonosSoundFeaturesAccessory {
       this.platform.log.debug('Set Speech Enhancement ->', value);
     } catch (err) {
       this.platform.log.error('Failed to set Speech Enhancement:', (err as Error).message);
+      this.triggerRediscovery();
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );

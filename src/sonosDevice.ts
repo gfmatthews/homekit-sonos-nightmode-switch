@@ -5,6 +5,7 @@ export interface DeviceInfo {
   name: string;
   ip: string;
   model?: string;
+  serialNumber?: string;
   supportsNightMode?: boolean;
   supportsSpeechEnhancement?: boolean;
 }
@@ -14,11 +15,14 @@ export interface DeviceInfo {
 // SOAP/HTTP calls for those while still using the library for discovery and
 // device descriptions.
 
+const DEFAULT_SOAP_TIMEOUT_MS = 5000;
+
 function soapRequest(
   host: string,
   port: number,
   action: string,
   body: string,
+  timeoutMs = DEFAULT_SOAP_TIMEOUT_MS,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const postData =
@@ -33,6 +37,7 @@ function soapRequest(
         port,
         path: '/MediaRenderer/RenderingControl/Control',
         method: 'POST',
+        timeout: timeoutMs,
         headers: {
           'Content-Type': 'text/xml; charset="utf-8"',
           'Content-Length': Buffer.byteLength(postData),
@@ -51,6 +56,10 @@ function soapRequest(
         });
       },
     );
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`SOAP ${action} timed out after ${timeoutMs}ms`));
+    });
     req.on('error', reject);
     req.write(postData);
     req.end();
@@ -70,14 +79,20 @@ function extractTagValue(xml: string, tag: string): string | undefined {
  * This module is shared between the Homebridge plugin and the web debug UI.
  */
 export class SonosNightModeDevice {
-  private readonly device: Sonos;
-  public readonly host: string;
+  private device: Sonos;
+  public host: string;
   private readonly port: number;
 
   constructor(host: string, port = 1400) {
     this.host = host;
     this.port = port;
     this.device = new Sonos(host, port);
+  }
+
+  /** Update the device IP address (e.g. after DHCP lease change). */
+  updateHost(newHost: string): void {
+    this.host = newHost;
+    this.device = new Sonos(newHost, this.port);
   }
 
   private async getEQ(eqType: string): Promise<boolean> {
@@ -136,6 +151,7 @@ export class SonosNightModeDevice {
       name: desc.roomName as string ?? this.host,
       ip: this.host,
       model: desc.modelDescription as string ?? desc.modelName as string,
+      serialNumber: desc.serialNum as string | undefined,
       supportsNightMode: nightMode,
       supportsSpeechEnhancement: speechEnh,
     };
