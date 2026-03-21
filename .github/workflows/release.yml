@@ -15,6 +15,11 @@ on:
         description: "Changelog entries (comma or newline separated)"
         required: true
         type: string
+      prerelease:
+        description: "Publish as pre-release (appends -beta.N suffix, publishes to beta npm tag)"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -52,6 +57,12 @@ jobs:
         run: |
           npm version ${{ inputs.bump }} --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            # Append -beta.<timestamp> suffix for uniqueness
+            SUFFIX="beta.$(date +%Y%m%d%H%M%S)"
+            VERSION="${VERSION}-${SUFFIX}"
+            npm version "$VERSION" --no-git-tag-version --allow-same-version
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Update CHANGELOG.md
@@ -103,10 +114,16 @@ jobs:
           done)
           gh release create "v${{ steps.bump.outputs.version }}" \
             --title "v${{ steps.bump.outputs.version }}" \
-            --notes "$NOTES"
+            --notes "$NOTES" \
+            ${{ inputs.prerelease == true && '--prerelease' || '' }}
 
       - name: Publish to npm
         if: env.NODE_AUTH_TOKEN != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
+        run: |
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi

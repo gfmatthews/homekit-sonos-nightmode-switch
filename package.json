@@ -20,7 +20,7 @@
   "homepage": "https://github.com/gfmatthews/homekit-sonos-nightmode-switch#readme",
   "engines": {
     "homebridge": "^1.8.0 || ^2.0.0-beta.0",
-    "node": "^18.20.4 || ^20.15.1 || ^22"
+    "node": ">=18"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
