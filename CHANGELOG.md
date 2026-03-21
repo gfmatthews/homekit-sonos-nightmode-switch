@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-03-21
+
+- fixes warning about naming of night mode and speech enhancement
+
+
 ## [0.1.0] - 2026-03-21
 
 - releasing features to public branch - auto discovery and better naming
