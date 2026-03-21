@@ -1,0 +1,49 @@
+{
+  "pluginAlias": "SonosSoundFeatures",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Expose Sonos soundbar Night Mode and Speech Enhancement as HomeKit switches.",
+  "footerDisplay": "For help, see the [README](https://github.com/gfmatthews/homekit-sonos-nightmode-switch#readme).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Platform Name",
+        "type": "string",
+        "default": "Sonos Sound Features",
+        "required": true
+      },
+      "discoveryTimeout": {
+        "title": "Discovery Timeout (seconds)",
+        "type": "integer",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "description": "How long to wait when auto-discovering Sonos devices on the network."
+      },
+      "devices": {
+        "title": "Devices",
+        "type": "array",
+        "description": "Manually specify Sonos soundbar IPs. If provided, auto-discovery is skipped.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Device Name",
+              "type": "string",
+              "description": "A friendly name for this device.",
+              "placeholder": "Living Room Soundbar"
+            },
+            "ip": {
+              "title": "IP Address",
+              "type": "string",
+              "format": "ipv4",
+              "required": true,
+              "description": "The IP address of the Sonos soundbar."
+            }
+          }
+        }
+      }
+    }
+  }
+}

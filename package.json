@@ -1,0 +1,52 @@
+{
+  "name": "homebridge-sonos-soundfeatures",
+  "version": "0.0.1",
+  "displayName": "Sonos Sound Features",
+  "description": "Homebridge plugin to expose Sonos soundbar Night Mode and Speech Enhancement as HomeKit switches",
+  "license": "MIT",
+  "keywords": [
+    "homebridge-plugin",
+    "sonos",
+    "nightmode",
+    "homekit"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gfmatthews/homekit-sonos-nightmode-switch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gfmatthews/homekit-sonos-nightmode-switch/issues"
+  },
+  "homepage": "https://github.com/gfmatthews/homekit-sonos-nightmode-switch#readme",
+  "engines": {
+    "homebridge": "^1.8.0 || ^2.0.0-beta.0",
+    "node": "^18.20.4 || ^20.15.1 || ^22"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "lint": "eslint src test",
+    "test": "jest --forceExit",
+    "web": "ts-node web/server.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "sonos": "^1.14.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.0",
+    "express": "^4.21.0",
+    "homebridge": "^2.0.0-beta.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.7.0"
+  }
+}

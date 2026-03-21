@@ -1,0 +1,12 @@
+src/
+test/
+web/
+.github/
+.vscode/
+.eslintrc.json
+tsconfig.json
+tsconfig.web.json
+jest.config.ts
+dist-web/
+*.ts
+!dist/**/*.d.ts
