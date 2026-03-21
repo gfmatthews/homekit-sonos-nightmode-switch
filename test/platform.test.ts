@@ -148,6 +148,7 @@ describe('SonosSoundFeaturesPlatform', () => {
       device: mockDevice,
     }]);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const platform = new SonosSoundFeaturesPlatform(log, config, api);
     api.__fire('didFinishLaunching');
 
