@@ -36,6 +36,9 @@
   <div class="controls">
     <button id="discoverBtn" onclick="discover()">Discover Devices</button>
     <span>or</span>
+    <input type="text" id="subnetInput" placeholder="192.168.1" style="width:140px;">
+    <button id="scanBtn" onclick="scanSubnet()">Scan Subnet</button>
+    <span>or</span>
     <input type="text" id="manualIp" placeholder="192.168.1.100">
     <button onclick="addManualDevice()">Add by IP</button>
   </div>
@@ -57,14 +60,14 @@
       const btn = document.getElementById('discoverBtn');
       btn.disabled = true;
       btn.textContent = 'Discovering...';
-      showStatus('Searching for Sonos devices on the network...', false);
+      showStatus('Searching for Sonos devices via SSDP...', false);
       try {
         const res = await fetch('/api/discover');
         const devices = await res.json();
         if (devices.error) throw new Error(devices.error);
         devicesEl.innerHTML = '';
         if (devices.length === 0) {
-          showStatus('No Sonos devices found. Try adding by IP.', true);
+          showStatus('SSDP found no devices (common in containers). Enter a subnet like 192.168.1 and click Scan Subnet, or add devices by IP.', true);
         } else {
           statusEl.style.display = 'none';
           for (const d of devices) {
@@ -72,10 +75,41 @@
           }
         }
       } catch (err) {
-        showStatus('Discovery failed: ' + err.message, true);
+        showStatus('Discovery failed: ' + err.message + '. Try Scan Subnet instead.', true);
       } finally {
         btn.disabled = false;
         btn.textContent = 'Discover Devices';
+      }
+    }
+
+    async function scanSubnet() {
+      var subnet = document.getElementById('subnetInput').value.trim();
+      if (!subnet) {
+        showStatus('Enter a subnet prefix like 192.168.1', true);
+        return;
+      }
+      var btn = document.getElementById('scanBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+      showStatus('Scanning ' + escapeHtml(subnet) + '.1–254 on port 1400 (this may take a moment)...', false);
+      try {
+        var res = await fetch('/api/scan?subnet=' + encodeURIComponent(subnet));
+        var devices = await res.json();
+        if (devices.error) throw new Error(devices.error);
+        devicesEl.innerHTML = '';
+        if (devices.length === 0) {
+          showStatus('No Sonos devices found on ' + escapeHtml(subnet) + '.x — verify the subnet is correct.', true);
+        } else {
+          statusEl.style.display = 'none';
+          for (var i = 0; i < devices.length; i++) {
+            await addDeviceCard(devices[i].ip, devices[i].name);
+          }
+        }
+      } catch (err) {
+        showStatus('Scan failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scan Subnet';
       }
     }
 

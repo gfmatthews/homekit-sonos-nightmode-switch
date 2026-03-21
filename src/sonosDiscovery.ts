@@ -1,3 +1,4 @@
+import net from 'net';
 import { AsyncDeviceDiscovery } from 'sonos';
 import { SonosNightModeDevice, DeviceInfo } from './sonosDevice';
 
@@ -7,16 +8,18 @@ export interface DiscoveredDevice {
 }
 
 /**
- * Discover Sonos devices on the local network.
- * Returns SonosNightModeDevice wrappers for each found device.
+ * Discover Sonos devices on the local network via SSDP multicast.
+ * Returns an empty array (instead of throwing) when no devices respond.
  */
 export async function discoverDevices(timeoutMs = 5000): Promise<DiscoveredDevice[]> {
   const discovery = new AsyncDeviceDiscovery();
-  const sonosDevice = await discovery.discover({ timeout: timeoutMs });
-
-  // discover() returns one device; use discoverMultiple for all
-  const allDevices = await discovery.discoverMultiple({ timeout: timeoutMs });
-  const devices: (typeof sonosDevice)[] = allDevices ?? [sonosDevice];
+  let devices;
+  try {
+    devices = await discovery.discoverMultiple({ timeout: timeoutMs });
+  } catch {
+    // SSDP found nothing (common in containers / restricted networks)
+    return [];
+  }
 
   const results: DiscoveredDevice[] = [];
   for (const dev of devices) {
@@ -49,5 +52,69 @@ export function createDevicesFromConfig(
       info: { name: d.name ?? d.ip, ip: d.ip },
       device: wrapper,
     };
+  });
+}
+
+/**
+ * Scan a subnet for Sonos devices by attempting a TCP connection to port 1400.
+ * Useful when SSDP multicast is unavailable (e.g. inside containers).
+ *
+ * @param subnet - base address like "192.168.1" (the /24 prefix)
+ * @param startHost - first host octet to scan (default 1)
+ * @param endHost   - last host octet to scan (default 254)
+ * @param timeoutMs - per-host TCP connect timeout (default 300ms)
+ */
+export async function scanSubnet(
+  subnet: string,
+  startHost = 1,
+  endHost = 254,
+  timeoutMs = 300,
+): Promise<DiscoveredDevice[]> {
+  const ips: string[] = [];
+  for (let i = startHost; i <= endHost; i++) {
+    ips.push(`${subnet}.${i}`);
+  }
+
+  // Probe all IPs in parallel with a short TCP timeout
+  const reachable = await Promise.all(
+    ips.map((ip) => probePort(ip, 1400, timeoutMs).then((ok) => (ok ? ip : null))),
+  );
+
+  const liveIps = reachable.filter((ip): ip is string => ip !== null);
+
+  // For each reachable IP, try to get device info
+  const results: DiscoveredDevice[] = [];
+  await Promise.all(
+    liveIps.map(async (ip) => {
+      const wrapper = new SonosNightModeDevice(ip);
+      try {
+        const info = await wrapper.getDeviceInfo();
+        results.push({ info, device: wrapper });
+      } catch {
+        // Reachable on 1400 but not a Sonos device — skip
+      }
+    }),
+  );
+
+  return results;
+}
+
+function probePort(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host);
   });
 }
