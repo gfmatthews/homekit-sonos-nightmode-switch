@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-beta.20260321130715] - 2026-03-21
+
+- adds support for auto discovery inside a docker container
+- better switch discovery and naming
+
+
 ## [0.0.2-beta.20260321121834] - 2026-03-21
 
 - Finally fixed publshing
