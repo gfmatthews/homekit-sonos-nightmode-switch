@@ -85,7 +85,7 @@
     async function scanSubnet() {
       var subnet = document.getElementById('subnetInput').value.trim();
       if (!subnet) {
-        showStatus('Enter a subnet prefix like 192.168.1', true);
+        showStatus('If running this from a docker container, try scan subnet: Enter a subnet prefix like 192.168.1', true);
         return;
       }
       var btn = document.getElementById('scanBtn');

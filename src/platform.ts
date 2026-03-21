@@ -10,7 +10,7 @@ import {
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { SonosSoundFeaturesAccessory } from './platformAccessory';
-import { discoverDevices, createDevicesFromConfig, DiscoveredDevice } from './sonosDiscovery';
+import { discoverDevices, createDevicesFromConfig, scanSubnet, DiscoveredDevice } from './sonosDiscovery';
 
 export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -49,9 +49,19 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
     if (configDevices && configDevices.length > 0) {
       this.log.info(`Using ${configDevices.length} manually configured device(s)`);
       discovered = createDevicesFromConfig(configDevices);
+    } else if (this.config.autoDiscovery?.subnet) {
+      const subnet = this.config.autoDiscovery.subnet as string;
+      const timeout = ((this.config.autoDiscovery.timeout as number) ?? (this.config.discoveryTimeout as number) ?? 5) * 1000;
+      this.log.info(`Scanning subnet ${subnet}.0/24 for Sonos devices (timeout: ${timeout}ms)...`);
+      try {
+        discovered = await scanSubnet(subnet, 1, 254, timeout);
+      } catch (err) {
+        this.log.error('Subnet scan failed:', (err as Error).message);
+        return;
+      }
     } else {
       const timeout = ((this.config.discoveryTimeout as number) ?? 5) * 1000;
-      this.log.info(`Discovering Sonos devices (timeout: ${timeout}ms)...`);
+      this.log.info(`Discovering Sonos devices via SSDP (timeout: ${timeout}ms)...`);
       try {
         discovered = await discoverDevices(timeout);
       } catch (err) {
