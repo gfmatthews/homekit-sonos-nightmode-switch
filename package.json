@@ -1,6 +1,6 @@
 {
   "name": "homebridge-sonos-soundfeatures",
-  "version": "0.1.1",
+  "version": "0.2.0-beta.20260321213353",
   "displayName": "Sonos Sound Features",
   "description": "Homebridge plugin to expose Sonos soundbar Night Mode and Speech Enhancement as HomeKit switches",
   "license": "MIT",

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-beta.20260321213353] - 2026-03-21
+
+- supports rediscovery of devices when one disappears from the network
+
+
 ## [0.1.1] - 2026-03-21
 
 - fixes warning about naming of night mode and speech enhancement
