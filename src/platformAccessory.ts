@@ -25,10 +25,9 @@ export class SonosSoundFeaturesAccessory {
         this.accessory.getService('Night Mode') ??
         this.accessory.addService(this.platform.Service.Switch, 'Night Mode', 'nightmode');
 
-      this.nightModeService.setCharacteristic(
-        this.platform.Characteristic.Name,
-        'Night Mode',
-      );
+      this.nightModeService
+        .setCharacteristic(this.platform.Characteristic.Name, 'Night Mode')
+        .setCharacteristic(this.platform.Characteristic.ConfiguredName, 'Night Mode');
 
       this.nightModeService
         .getCharacteristic(this.platform.Characteristic.On)
@@ -42,10 +41,9 @@ export class SonosSoundFeaturesAccessory {
         this.accessory.getService('Speech Enhancement') ??
         this.accessory.addService(this.platform.Service.Switch, 'Speech Enhancement', 'speechenhancement');
 
-      this.speechEnhancementService.setCharacteristic(
-        this.platform.Characteristic.Name,
-        'Speech Enhancement',
-      );
+      this.speechEnhancementService
+        .setCharacteristic(this.platform.Characteristic.Name, 'Speech Enhancement')
+        .setCharacteristic(this.platform.Characteristic.ConfiguredName, 'Speech Enhancement');
 
       this.speechEnhancementService
         .getCharacteristic(this.platform.Characteristic.On)
