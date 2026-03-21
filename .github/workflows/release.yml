@@ -37,9 +37,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -119,11 +122,9 @@ jobs:
             ${{ inputs.prerelease == true && '--prerelease' || '' }}
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ "${{ inputs.prerelease }}" = "true" ]; then
-            npm publish --provenance --access public --tag beta
+            npm publish --access public --tag beta
           else
-            npm publish --provenance --access public
+            npm publish --access public
           fi
