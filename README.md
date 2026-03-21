@@ -33,7 +33,43 @@ Add the platform to your Homebridge `config.json`:
     {
       "platform": "SonosSoundFeatures",
       "name": "Sonos Sound Features",
-      "discoveryTimeout": 5,
+      "discoveryTimeout": 5
+    }
+  ]
+}
+```
+
+By default, the plugin discovers Sonos devices via SSDP multicast. If that doesn't work (e.g. Docker), you can use subnet scanning or specify devices manually:
+
+<details>
+<summary>Subnet scanning (Docker / isolated networks)</summary>
+
+```json
+{
+  "platforms": [
+    {
+      "platform": "SonosSoundFeatures",
+      "name": "Sonos Sound Features",
+      "autoDiscovery": {
+        "subnet": "192.168.1",
+        "timeout": 5
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary>Manual device configuration</summary>
+
+```json
+{
+  "platforms": [
+    {
+      "platform": "SonosSoundFeatures",
+      "name": "Sonos Sound Features",
       "devices": [
         {
           "name": "Living Room Soundbar",
@@ -45,16 +81,24 @@ Add the platform to your Homebridge `config.json`:
 }
 ```
 
+</details>
+
 ### Options
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `platform` | Yes | — | Must be `SonosSoundFeatures` |
 | `name` | Yes | — | Display name for the platform |
-| `discoveryTimeout` | No | `5` | Seconds to wait for auto-discovery (1–30) |
-| `devices` | No | — | Array of `{ name, ip }` for manual device config. If provided, auto-discovery is skipped. |
+| `discoveryTimeout` | No | `5` | Seconds to wait for SSDP auto-discovery (1–30) |
+| `autoDiscovery.subnet` | No | — | First three octets of your network (e.g. `192.168.1`). Performs a TCP scan on port 1400 across the /24 range. Use when SSDP is unavailable (e.g. Docker). |
+| `autoDiscovery.timeout` | No | `5` | Seconds to wait for each host during subnet scanning (1–30) |
+| `devices` | No | — | Array of `{ name, ip }` for manual device config. If provided, all discovery is skipped. |
 
-If `devices` is omitted, Sonos devices will be auto-discovered on your local network.
+### Discovery priority
+
+1. **Manual** — if `devices` is provided, those IPs are used directly
+2. **Subnet scan** — if `autoDiscovery.subnet` is set, a TCP port scan finds Sonos devices
+3. **SSDP** (default) — multicast discovery on the local network
 
 ## Development
 
