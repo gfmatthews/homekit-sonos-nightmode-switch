@@ -119,6 +119,8 @@ jobs:
             ${{ inputs.prerelease == true && '--prerelease' || '' }}
 
       - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ "${{ inputs.prerelease }}" = "true" ]; then
             npm publish --provenance --access public --tag beta
