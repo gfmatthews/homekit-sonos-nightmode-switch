@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] - 2026-03-21
+
+- releasing features to public branch - auto discovery and better naming
+
+
 ## [0.1.0-beta.20260321130715] - 2026-03-21
 
 - adds support for auto discovery inside a docker container
