@@ -21,6 +21,29 @@
         "maximum": 30,
         "description": "How long to wait when auto-discovering Sonos devices on the network."
       },
+      "autoDiscovery": {
+        "title": "Auto-Discovery",
+        "type": "object",
+        "description": "Configure automatic subnet scanning for Sonos devices. Use this when SSDP multicast is unavailable (e.g. You're running Homebridge in a docker container).",
+        "properties": {
+          "subnet": {
+            "title": "Subnet Prefix",
+            "type": "string",
+            "pattern": "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$",
+            "placeholder": "192.168.1",
+            "description": "The first three octets of your network (e.g. 192.168.1). A TCP scan on port 1400 will be performed across the /24 range."
+          },
+          "timeout": {
+            "title": "Scan Timeout (seconds)",
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 30,
+            "description": "How long to wait for each host during subnet scanning."
+          }
+        },
+        "required": ["subnet"]
+      },
       "devices": {
         "title": "Devices",
         "type": "array",
