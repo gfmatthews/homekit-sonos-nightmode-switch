@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-22
+
+- supports auto-discovery of devices across reboots and wifi changes in case the system gets assigned a different wifi address.
+
+
 ## [0.2.0-beta.20260321213353] - 2026-03-21
 
 - supports rediscovery of devices when one disappears from the network
