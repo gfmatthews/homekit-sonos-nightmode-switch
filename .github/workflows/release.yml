@@ -42,7 +42,11 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+        # Use --force to work around https://github.com/npm/cli/issues/5234
+        # where self-upgrading npm in place can fail with MODULE_NOT_FOUND
+        # (e.g. "Cannot find module 'promise-retry'") due to files being
+        # overwritten while npm is still running.
+        run: npm install -g npm@latest --force
 
       - name: Install dependencies
         run: npm ci
