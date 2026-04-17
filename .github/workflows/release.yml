@@ -37,16 +37,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24 ships with npm 11, which natively supports OIDC
+          # trusted publishing. This avoids the need to self-upgrade npm
+          # (see https://github.com/npm/cli/issues/5234, which can fail
+          # with MODULE_NOT_FOUND such as "Cannot find module 'promise-retry'"
+          # even with --force because files are overwritten while npm is
+          # still running).
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm for OIDC trusted publishing
-        # Use --force to work around https://github.com/npm/cli/issues/5234
-        # where self-upgrading npm in place can fail with MODULE_NOT_FOUND
-        # (e.g. "Cannot find module 'promise-retry'") due to files being
-        # overwritten while npm is still running.
-        run: npm install -g npm@latest --force
 
       - name: Install dependencies
         run: npm ci
