@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-04-17
+
+- minor security fixes
+
+
 ## [0.2.1] - 2026-03-29
 
 - minor bugfixes
