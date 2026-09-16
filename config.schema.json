@@ -21,6 +21,14 @@
         "maximum": 30,
         "description": "How long to wait when auto-discovering Sonos devices on the network."
       },
+      "pollInterval": {
+        "title": "State Refresh Interval (seconds)",
+        "type": "integer",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 3600,
+        "description": "Refresh Night Mode and Speech Enhancement changes made outside HomeKit. Use 10–3600 seconds, or 0 to disable background refresh. Invalid values fall back to 30 seconds. Each cycle completes before the next interval starts."
+      },
       "rediscoveryCooldown": {
         "title": "Re-discovery Cooldown (seconds)",
         "type": "integer",

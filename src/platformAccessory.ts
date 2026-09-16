@@ -1,4 +1,4 @@
-import { PlatformAccessory, CharacteristicValue, Service } from 'homebridge';
+import type { PlatformAccessory, CharacteristicValue, Service } from 'homebridge';
 import { SonosSoundFeaturesPlatform } from './platform';
 import { SonosNightModeDevice, DeviceInfo } from './sonosDevice';
 
@@ -6,6 +6,10 @@ export class SonosSoundFeaturesAccessory {
   private nightModeService?: Service;
   private speechEnhancementService?: Service;
   private readonly serialNumber?: string;
+  private stopped = false;
+  private rediscovering = false;
+  private stateRevision = 0;
+  private pendingWrites = 0;
 
   constructor(
     private readonly platform: SonosSoundFeaturesPlatform,
@@ -25,7 +29,7 @@ export class SonosSoundFeaturesAccessory {
     // Night Mode switch (only on supported devices)
     if (info.supportsNightMode) {
       this.nightModeService =
-        this.accessory.getService('Night Mode') ??
+        this.accessory.getServiceById(this.platform.Service.Switch, 'nightmode') ??
         this.accessory.addService(this.platform.Service.Switch, 'Night Mode', 'nightmode');
 
       this.nightModeService.addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName);
@@ -41,7 +45,7 @@ export class SonosSoundFeaturesAccessory {
     // Speech Enhancement switch (only on supported devices)
     if (info.supportsSpeechEnhancement) {
       this.speechEnhancementService =
-        this.accessory.getService('Speech Enhancement') ??
+        this.accessory.getServiceById(this.platform.Service.Switch, 'speechenhancement') ??
         this.accessory.addService(this.platform.Service.Switch, 'Speech Enhancement', 'speechenhancement');
 
       this.speechEnhancementService.addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName);
@@ -55,16 +59,54 @@ export class SonosSoundFeaturesAccessory {
     }
   }
 
+  dispose(): void {
+    this.stopped = true;
+  }
+
+  async refreshState(): Promise<void> {
+    if (this.stopped || this.pendingWrites > 0) {
+      return;
+    }
+    const revision = this.stateRevision;
+    await Promise.all([
+      this.refreshService(this.nightModeService, () => this.device.getNightMode(), revision),
+      this.refreshService(this.speechEnhancementService, () => this.device.getSpeechEnhancement(), revision),
+    ]);
+  }
+
+  private async refreshService(service: Service | undefined, read: () => Promise<boolean>, revision: number): Promise<void> {
+    if (!service) {
+      return;
+    }
+    try {
+      const value = await read();
+      // A HomeKit write or shutdown may have happened while the network read was pending.
+      if (!this.stopped && revision === this.stateRevision) {
+        service.updateCharacteristic(this.platform.Characteristic.On, value);
+      }
+    } catch (err) {
+      if (!this.stopped && revision === this.stateRevision) {
+        this.platform.log.debug(`State refresh failed for "${this.accessory.displayName}":`, String(err));
+        service.updateCharacteristic(
+          this.platform.Characteristic.On,
+          new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE),
+        );
+        this.triggerRediscovery();
+      }
+    }
+  }
+
   /**
    * Fire-and-forget background re-discovery after a communication failure.
    * If successful, updates the device host so the next HomeKit request uses the new IP.
    */
   private triggerRediscovery(): void {
-    if (!this.serialNumber) {
+    if (!this.serialNumber || this.stopped || this.rediscovering) {
       return;
     }
+    this.rediscovering = true;
     this.platform.rediscoverDevice(this.serialNumber).then((newIp) => {
-      if (newIp && newIp !== this.device.host) {
+      if (!this.stopped && newIp && newIp !== this.device.host) {
         this.platform.log.info(
           `Updating "${this.accessory.displayName}" from ${this.device.host} to ${newIp}`,
         );
@@ -75,6 +117,8 @@ export class SonosSoundFeaturesAccessory {
       }
     }).catch((err) => {
       this.platform.log.debug('Background re-discovery error:', (err as Error).message);
+    }).finally(() => {
+      this.rediscovering = false;
     });
   }
 
@@ -93,6 +137,8 @@ export class SonosSoundFeaturesAccessory {
   }
 
   async setNightMode(value: CharacteristicValue): Promise<void> {
+    this.stateRevision++;
+    this.pendingWrites++;
     try {
       await this.device.setNightMode(value as boolean);
       this.platform.log.debug('Set Night Mode ->', value);
@@ -102,6 +148,9 @@ export class SonosSoundFeaturesAccessory {
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );
+    } finally {
+      this.pendingWrites--;
+      this.stateRevision++;
     }
   }
 
@@ -120,6 +169,8 @@ export class SonosSoundFeaturesAccessory {
   }
 
   async setSpeechEnhancement(value: CharacteristicValue): Promise<void> {
+    this.stateRevision++;
+    this.pendingWrites++;
     try {
       await this.device.setSpeechEnhancement(value as boolean);
       this.platform.log.debug('Set Speech Enhancement ->', value);
@@ -129,6 +180,9 @@ export class SonosSoundFeaturesAccessory {
       throw new this.platform.api.hap.HapStatusError(
         this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE,
       );
+    } finally {
+      this.pendingWrites--;
+      this.stateRevision++;
     }
   }
 }

@@ -1,4 +1,4 @@
-import {
+import type {
   API,
   DynamicPlatformPlugin,
   Logging,
@@ -27,6 +27,10 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
   private ssdpTimeout = 5000;
   private readonly rediscoveryCooldownMs: number;
   private readonly lastRediscoveryAttempt = new Map<string, number>();
+  private readonly activeAccessories: SonosSoundFeaturesAccessory[] = [];
+  private readonly pollIntervalMs: number;
+  private pollTimer?: NodeJS.Timeout;
+  private shuttingDown = false;
 
   constructor(
     public readonly log: Logging,
@@ -38,13 +42,53 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
 
     this.rediscoveryCooldownMs =
       ((config.rediscoveryCooldown as number | undefined) ?? 60) * 1000;
+    const pollInterval = config.pollInterval ?? 30;
+    if (typeof pollInterval === 'number' && Number.isInteger(pollInterval) &&
+        (pollInterval === 0 || (pollInterval >= 10 && pollInterval <= 3600))) {
+      this.pollIntervalMs = pollInterval * 1000;
+    } else {
+      this.log.warn('Invalid pollInterval; using 30 seconds (expected 0 or an integer from 10 to 3600).');
+      this.pollIntervalMs = 30_000;
+    }
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
       this.log.debug('didFinishLaunching — discovering devices');
-      this.discoverAndRegisterDevices();
+      void this.discoverAndRegisterDevices()
+        .then(() => this.schedulePoll())
+        .catch((err) => this.log.error('Platform startup failed:', String(err)));
     });
+
+    this.api.on('shutdown', () => {
+      this.shuttingDown = true;
+      clearTimeout(this.pollTimer);
+      for (const accessory of this.activeAccessories) {
+        accessory.dispose();
+      }
+    });
+  }
+
+  private schedulePoll(): void {
+    if (this.shuttingDown || this.pollIntervalMs === 0 || this.activeAccessories.length === 0) {
+      return;
+    }
+    this.pollTimer = setTimeout(() => {
+      void this.pollAccessories()
+        .catch((err) => this.log.debug('State refresh failed:', String(err)))
+        .finally(() => this.schedulePoll());
+    }, this.pollIntervalMs);
+    this.pollTimer.unref();
+  }
+
+  private async pollAccessories(): Promise<void> {
+    // One device at a time, and schedule only after completion to avoid overlapping scans.
+    for (const accessory of this.activeAccessories) {
+      if (this.shuttingDown) {
+        return;
+      }
+      await accessory.refreshState();
+    }
   }
 
   /**
@@ -65,6 +109,9 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
   }
 
   private async discoverAndRegisterDevices(): Promise<void> {
+    if (this.shuttingDown) {
+      return;
+    }
     let discovered: DiscoveredDevice[];
 
     const configDevices = this.config.devices as Array<{ name?: string; ip: string }> | undefined;
@@ -97,6 +144,9 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
       }
     }
 
+    if (this.shuttingDown) {
+      return;
+    }
     this.log.info(`Found ${discovered.length} device(s)`);
 
     const matchedUUIDs = new Set<string>();
@@ -107,6 +157,9 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
         d.info = await d.device.getDeviceInfo();
       } catch (err) {
         this.log.warn(`Could not get info for ${d.info.ip}:`, (err as Error).message);
+      }
+      if (this.shuttingDown) {
+        return;
       }
 
       if (!d.info.supportsNightMode && !d.info.supportsSpeechEnhancement) {
@@ -122,12 +175,12 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
         this.log.info('Restoring existing accessory:', existingAccessory.displayName);
         existingAccessory.context.device = d.info;
         this.api.updatePlatformAccessories([existingAccessory]);
-        new SonosSoundFeaturesAccessory(this, existingAccessory, d.device, d.info);
+        this.activeAccessories.push(new SonosSoundFeaturesAccessory(this, existingAccessory, d.device, d.info));
       } else {
         this.log.info('Adding new accessory:', d.info.name);
         const accessory = new this.api.platformAccessory(d.info.name, uuid);
         accessory.context.device = d.info;
-        new SonosSoundFeaturesAccessory(this, accessory, d.device, d.info);
+        this.activeAccessories.push(new SonosSoundFeaturesAccessory(this, accessory, d.device, d.info));
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     }
@@ -149,7 +202,7 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
         'Will attempt re-discovery on next communication failure.',
       );
       const device = new SonosNightModeDevice(cachedInfo.ip);
-      new SonosSoundFeaturesAccessory(this, accessory, device, cachedInfo);
+      this.activeAccessories.push(new SonosSoundFeaturesAccessory(this, accessory, device, cachedInfo));
     }
   }
 
@@ -159,6 +212,9 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
    * hammering the network after repeated failures.
    */
   async rediscoverDevice(serialNumber: string): Promise<string | null> {
+    if (this.shuttingDown) {
+      return null;
+    }
     if (this.discoveryMethod === 'manual') {
       this.log.warn(
         `Cannot auto-rediscover device ${serialNumber} — using manually configured IPs. ` +
@@ -196,12 +252,15 @@ export class SonosSoundFeaturesPlatform implements DynamicPlatformPlugin {
 
     // Fetch full info for discovered devices and match by serial
     for (const d of discovered) {
+      if (this.shuttingDown) {
+        return null;
+      }
       try {
         d.info = await d.device.getDeviceInfo();
       } catch {
         continue;
       }
-      if (d.info.serialNumber === serialNumber) {
+      if (!this.shuttingDown && d.info.serialNumber === serialNumber) {
         this.log.info(`Re-discovered device ${serialNumber} at new IP ${d.info.ip}`);
         return d.info.ip;
       }
