@@ -27,8 +27,9 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "lint": "eslint src test",
-    "test": "jest --forceExit",
+    "lint": "eslint src test --ext .ts,.mjs",
+    "pretest": "npm run build",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "web": "ts-node web/server.ts",
     "prepublishOnly": "npm run build"
   },

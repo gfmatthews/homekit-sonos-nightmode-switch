@@ -82,7 +82,10 @@ export class SonosSoundFeaturesAccessory {
       const value = await read();
       // A HomeKit write or shutdown may have happened while the network read was pending.
       if (!this.stopped && revision === this.stateRevision) {
-        service.updateCharacteristic(this.platform.Characteristic.On, value);
+        const characteristic = service.getCharacteristic(this.platform.Characteristic.On);
+        if (characteristic.value !== value || characteristic.statusCode !== this.platform.api.hap.HAPStatus.SUCCESS) {
+          service.updateCharacteristic(this.platform.Characteristic.On, value);
+        }
       }
     } catch (err) {
       if (!this.stopped && revision === this.stateRevision) {
