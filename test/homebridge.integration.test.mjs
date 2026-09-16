@@ -274,6 +274,23 @@ describe('real Homebridge integration', () => {
     expect(getSpeechEnhancement).toHaveBeenCalledTimes(2);
   });
 
+  it('continues to later devices and the next cycle after failed reads', async () => {
+    SonosNightModeDevice.prototype.getDeviceInfo.mockImplementation(async function () {
+      return { ...deviceInfo, ip: this.host, serialNumber: this.host };
+    });
+    await launch({ devices: [{ ip: deviceInfo.ip }, { ip: '192.168.1.101' }] });
+    getNightMode.mockRejectedValueOnce(new Error('response interrupted'));
+    getSpeechEnhancement.mockRejectedValueOnce(new Error('response interrupted'));
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(getNightMode).toHaveBeenCalledTimes(2);
+    expect(getSpeechEnhancement).toHaveBeenCalledTimes(2);
+    expect(on('nightmode').statusCode).toBe(api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(getNightMode).toHaveBeenCalledTimes(4);
+    expect(getSpeechEnhancement).toHaveBeenCalledTimes(4);
+    expect(on('nightmode').statusCode).toBe(api.hap.HAPStatus.SUCCESS);
+  });
+
   it('discards a stale poll that finishes after a HomeKit write', async () => {
     createAccessory();
     let finish;

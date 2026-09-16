@@ -43,6 +43,7 @@ function setupHttpMock(statusCode: number, responseBody: string) {
   const requestEmitter = Object.assign(new EventEmitter(), {
     write: jest.fn(),
     end: jest.fn(),
+    destroy: jest.fn(),
   });
 
   mockHttpRequest.mockImplementation((_opts: unknown, cb: (res: EventEmitter & { statusCode: number }) => void) => {
@@ -236,6 +237,67 @@ describe('SonosNightModeDevice', () => {
       });
 
       await expect(device.getNightMode()).rejects.toThrow('timed out');
+    });
+
+    it('enforces a deadline even if the socket never emits a timeout', async () => {
+      jest.useFakeTimers();
+      try {
+        const requestEmitter = Object.assign(new EventEmitter(), {
+          write: jest.fn(),
+          end: jest.fn(),
+          destroy: jest.fn(),
+        });
+        mockHttpRequest.mockReturnValue(requestEmitter);
+        const result = expect(device.getNightMode()).rejects.toThrow('timed out after 5000ms');
+        jest.advanceTimersByTime(5000);
+        await result;
+        expect(requestEmitter.destroy).toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('interrupted SOAP responses', () => {
+    it('rejects a real HTTP response disconnected mid-body instead of leaving polling pending', async () => {
+      const realHttp = jest.requireActual<typeof http>('http');
+      mockHttpRequest.mockImplementation(realHttp.request);
+      const server = realHttp.createServer((_req, res) => {
+        res.writeHead(200, { 'Content-Length': '1000' });
+        res.write('<s:Envelope>');
+        setImmediate(() => res.destroy());
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      try {
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('Expected a TCP server address');
+        }
+        const localDevice = new SonosNightModeDevice('127.0.0.1', address.port);
+        await expect(localDevice.getNightMode()).rejects.toThrow(/interrupted|socket hang up|aborted/);
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    });
+
+    it('rejects response errors and destroys the request', async () => {
+      const requestEmitter = Object.assign(new EventEmitter(), {
+        write: jest.fn(),
+        end: jest.fn(),
+        destroy: jest.fn(),
+      });
+      mockHttpRequest.mockImplementation((_opts: unknown, cb: (res: EventEmitter) => void) => {
+        process.nextTick(() => {
+          const response = new EventEmitter();
+          cb(response);
+          response.emit('error', new Error('response failed'));
+        });
+        return requestEmitter;
+      });
+      await expect(device.getNightMode()).rejects.toThrow('response failed');
+      expect(requestEmitter.destroy).toHaveBeenCalled();
     });
   });
 });

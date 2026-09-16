@@ -102,7 +102,7 @@ By default, the plugin discovers Sonos devices via SSDP multicast. If that doesn
 | `platform` | Yes | — | Must be `SonosSoundFeatures` |
 | `name` | Yes | — | Display name for the platform |
 | `discoveryTimeout` | No | `5` | Seconds to wait for SSDP auto-discovery (1–30) |
-| `pollInterval` | No | `30` | Seconds between completed background refresh cycles (10–3600). Set `0` to disable polling; invalid values fall back to 30. HomeKit reads/writes still work when polling is disabled. |
+| `pollInterval` | No | `30` | Seconds to wait after each completed background refresh cycle (10–3600). Set `0` to disable polling; invalid values fall back to 30. HomeKit reads/writes still work when polling is disabled. |
 | `rediscoveryCooldown` | No | `60` | Minimum seconds between re-discovery attempts for a device after communication failure (10–600). Manual IP configurations are not auto-rediscovered. |
 | `autoDiscovery.subnet` | No | — | First three octets of your network (e.g. `192.168.1`). Performs a TCP scan on port 1400 across the /24 range. Use when SSDP is unavailable (e.g. Docker). |
 | `autoDiscovery.timeout` | No | `5` | Seconds to wait for each host during subnet scanning (1–30) |
@@ -117,8 +117,9 @@ By default, the plugin discovers Sonos devices via SSDP multicast. If that doesn
 ### State synchronization
 
 The plugin polls supported sound features and publishes changes made in the Sonos app to Apple Home.
-It checks one device at a time, with at most two EQ requests in flight per cycle, and waits for the cycle to complete
-before starting the next interval. Each EQ request uses the existing five-second network timeout.
+Normal refresh checks one device at a time, with at most two EQ reads in flight, and waits for the cycle to complete
+before starting the next interval. Each EQ request has a five-second deadline, and interrupted responses fail promptly
+so one stalled device cannot block subsequent refreshes. Re-discovery after a failure runs separately.
 Polling never writes settings to Sonos, and unchanged values are not republished.
 Failed reads mark the affected switch unavailable rather than incorrectly reporting it as off; a successful refresh clears the error.
 

@@ -47,7 +47,10 @@ function soapRequest(
       (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
+        res.on('error', rejectRequest);
+        res.on('aborted', () => rejectRequest(new Error(`SOAP ${action} response interrupted`)));
         res.on('end', () => {
+          clearTimeout(deadline);
           if (res.statusCode === 200) {
             resolve(data);
           } else {
@@ -56,11 +59,16 @@ function soapRequest(
         });
       },
     );
-    req.on('timeout', () => {
+    const rejectRequest = (err: Error): void => {
+      clearTimeout(deadline);
       req.destroy();
-      reject(new Error(`SOAP ${action} timed out after ${timeoutMs}ms`));
-    });
-    req.on('error', reject);
+      reject(err);
+    };
+    // Bound the whole request, not just idle socket time, so one device cannot stall polling.
+    const onTimeout = (): void => rejectRequest(new Error(`SOAP ${action} timed out after ${timeoutMs}ms`));
+    const deadline = setTimeout(onTimeout, timeoutMs);
+    req.on('timeout', onTimeout);
+    req.on('error', rejectRequest);
     req.write(postData);
     req.end();
   });
